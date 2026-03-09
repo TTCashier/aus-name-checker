@@ -1,0 +1,22 @@
+# Project
+CLAUDE.md
+
+# Config and credentials
+.name-checker-config.json
+.name-checker-history.json
+cad.txt
+
+# Python
+*.pyc
+__pycache__/
+
+# Output artifacts
+out.*
+report.html
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
