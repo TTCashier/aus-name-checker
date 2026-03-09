@@ -27,8 +27,8 @@ def check_github(name: str) -> dict:
             result["available"] = True
         elif resp.status_code == 200:
             result["available"] = False
-    except Exception:
-        pass
+    except Exception as e:
+        result["error"] = str(e)
     return result
 
 
@@ -60,8 +60,8 @@ def check_reddit(name: str) -> dict:
                     result["detail"] = "subreddit exists"
             except Exception:
                 pass
-    except Exception:
-        pass
+    except Exception as e:
+        result["error"] = str(e)
     return result
 
 
@@ -79,8 +79,8 @@ def check_pypi(name: str) -> dict:
             result["available"] = True
         elif resp.status_code == 200:
             result["available"] = False
-    except Exception:
-        pass
+    except Exception as e:
+        result["error"] = str(e)
     return result
 
 
@@ -98,8 +98,8 @@ def check_npm(name: str) -> dict:
             result["available"] = True
         elif resp.status_code == 200:
             result["available"] = False
-    except Exception:
-        pass
+    except Exception as e:
+        result["error"] = str(e)
     return result
 
 

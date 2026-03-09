@@ -348,13 +348,7 @@ def display_results(name: str, domains: list, abn: dict, trademark: dict,
     if abn.get("error") == "skipped":
         print(_box_line(f"  {DIM}— skipped{RESET}"))
     elif abn.get("error"):
-        err = abn["error"]
-        if err == "no_guid":
-            print(_box_line(f"  {YELLOW}⚠ No API GUID — using web scrape{RESET}"))
-        elif err == "invalid_guid":
-            print(_box_line(f"  {YELLOW}⚠ Invalid GUID — re-run --setup-abn{RESET}"))
-        else:
-            print(_box_line(f"  {YELLOW}⚠ Error: {err}{RESET}"))
+        print(_box_line(f"  {YELLOW}⚠ Error: {abn['error']}{RESET}"))
     elif not abn["matches"]:
         print(_box_line(f"  {GREEN}✓ No matching business names found{RESET}"))
     else:
@@ -404,6 +398,8 @@ def display_results(name: str, domains: list, abn: dict, trademark: dict,
                     print(_box_line(f"  {s['platform']:12s}  {GREEN}✓ available{RESET}"))
                 elif s["available"] is False:
                     print(_box_line(f"  {s['platform']:12s}  {RED}✗ taken{RESET}"))
+                elif s.get("error"):
+                    print(_box_line(f"  {s['platform']:12s}  {YELLOW}? error{RESET}   {DIM}{s['error']}{RESET}"))
                 else:
                     print(_box_line(f"  {s['platform']:12s}  {YELLOW}? check{RESET}   {DIM}{s['url']}{RESET}"))
 
@@ -446,14 +442,11 @@ def _display_tm_matches(trademark: dict):
             return "pending"
         if sg in ("REMOVED", "LAPSED", "REFUSED") or any(kw in sl for kw in ("lapsed", "expired", "removed", "withdrawn", "ceased", "revoked", "not register", "not renewed")):
             return "expired"
-        if not m.get("status") and m.get("source") == "google":
-            return "needs_review"
         return "other"
 
     registered = [m for m in trademark["matches"] if _classify_tm(m) == "registered"]
     pending = [m for m in trademark["matches"] if _classify_tm(m) == "pending"]
     expired = [m for m in trademark["matches"] if _classify_tm(m) == "expired"]
-    needs_review = [m for m in trademark["matches"] if _classify_tm(m) == "needs_review"]
     other = [m for m in trademark["matches"] if _classify_tm(m) == "other"]
 
     def _tm_line(m):
@@ -502,10 +495,6 @@ def _display_tm_matches(trademark: dict):
             print(_box_line(_tm_line(m)))
             for line in _tm_details(m):
                 print(_box_line(line))
-    if needs_review:
-        print(_box_line(f"  {YELLOW}⚠ Check status ({len(needs_review)}):{RESET}"))
-        for m in needs_review:
-            print(_box_line(f"    #{m['number']}"))
     if other:
         label = "Other" if registered or pending or expired else "Results"
         print(_box_line(f"  {DIM}{label} ({len(other)}):{RESET}"))

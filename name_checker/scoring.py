@@ -37,10 +37,6 @@ def tm_status(trademark: dict):
                or "filed" in (m.get("status") or "").lower()]
     if pending:
         return "close"
-    needs_review = [m for m in trademark["matches"]
-                    if not m.get("status") and m.get("source") == "google"]
-    if needs_review:
-        return "close"
     return True
 
 

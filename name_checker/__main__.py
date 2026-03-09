@@ -6,7 +6,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 
-from . import config
+from . import __version__, config
 from .config import load_config, save_config, CONFIG_PATH
 from .display import (
     ProgressTracker, run_spinner, display_results, display_summary,
@@ -139,6 +139,7 @@ def setup_abn():
 
 
 def setup_tm():
+    load_config()
     print(f"""
    {bold('IP Australia Trademark API Setup')}
    {'─' * 40}
@@ -150,13 +151,48 @@ def setup_tm():
    2. Create an account and request access to the
       "Australian Trade Mark Search API"
    3. Once approved, you will get a Client ID and Client Secret
-
-   Enter them below.
-   (Without these, the script uses web search fallback.)
 """)
+    if config.TM_CLIENT_ID:
+        masked_id = config.TM_CLIENT_ID[:4] + "..." + config.TM_CLIENT_ID[-4:]
+        masked_secret = config.TM_CLIENT_SECRET[:4] + "..." + config.TM_CLIENT_SECRET[-4:] if config.TM_CLIENT_SECRET else "(not set)"
+        print(f"   Current Client ID:     {masked_id}")
+        print(f"   Current Client Secret: {masked_secret}")
+        print(f"   {dim('Press Enter to keep existing values.')}\n")
+
     client_id = input("   Client ID: ").strip()
     client_secret = input("   Client Secret: ").strip()
+
+    # Keep existing values if user pressed Enter
+    if not client_id and config.TM_CLIENT_ID:
+        client_id = config.TM_CLIENT_ID
+    if not client_secret and config.TM_CLIENT_SECRET:
+        client_secret = config.TM_CLIENT_SECRET
+
     if client_id and client_secret:
+        # Test credentials before saving
+        print(f"\n   {dim('Testing credentials...')}")
+        try:
+            import requests
+            resp = requests.post(config.TM_TOKEN_URL, data={
+                "grant_type": "client_credentials",
+                "client_id": client_id,
+                "client_secret": client_secret,
+            }, timeout=10)
+            if resp.status_code == 200:
+                print(f"   {avail('✓ Credentials verified!')}")
+            else:
+                print(f"   {warn(f'⚠ Auth returned HTTP {resp.status_code} — credentials may be invalid')}")
+                confirm = input(f"   Save anyway? [y/N] ").strip().lower()
+                if confirm != "y":
+                    print(f"\n   {dim('Aborted. Credentials not saved.')}\n")
+                    return
+        except Exception as e:
+            print(f"   {warn(f'⚠ Could not test credentials: {e}')}")
+            confirm = input(f"   Save anyway? [y/N] ").strip().lower()
+            if confirm != "y":
+                print(f"\n   {dim('Aborted. Credentials not saved.')}\n")
+                return
+
         save_config(tm_client_id=client_id, tm_client_secret=client_secret)
         print(f"\n   {avail('✓ Saved!')} Credentials stored in {CONFIG_PATH}")
         print(f"   Trademark checks will now use the official API.\n")
@@ -169,6 +205,7 @@ def main():
         description="Check Australian domain, ABN, trademark, and social media availability",
         epilog="Example: python check.py FuelMate PetrolPal BowserBuddy",
     )
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument("names", nargs="*", help="Names to check")
     parser.add_argument("--interactive", "-i", action="store_true", help="Enter names interactively")
     parser.add_argument("--stdin", action="store_true", help="Read names from stdin (one per line)")
@@ -176,7 +213,9 @@ def main():
     parser.add_argument("--setup-tm", action="store_true", help="Configure IP Australia API key")
     parser.add_argument("--domains-only", action="store_true", help="Only check domains")
     parser.add_argument("--no-abn", action="store_true", help="Skip ABN check")
+    parser.add_argument("--no-tm", action="store_true", help="Skip trademark check")
     parser.add_argument("--no-socials", action="store_true", help="Skip social media checks")
+    parser.add_argument("--quiet", "-q", action="store_true", help="Minimal output (no banner, no spinner)")
     parser.add_argument("--no-rules", action="store_true", help="Skip ASIC naming rules check")
     parser.add_argument("--csv", metavar="FILE", help="Export results to CSV file")
     parser.add_argument("--json", metavar="FILE", help="Export results to JSON file")
@@ -315,11 +354,15 @@ def main():
     # Determine platforms
     if args.platforms:
         platforms = [p.strip().lower() for p in args.platforms.split(",")]
+        unknown = [p for p in platforms if p not in ALL_PLATFORMS]
+        if unknown:
+            print(f"   {warn(f'Unknown platforms ignored: {', '.join(unknown)}')}")
+        platforms = [p for p in platforms if p in ALL_PLATFORMS]
     else:
         platforms = None  # Use defaults
 
     skip_abn = args.domains_only or args.no_abn
-    skip_tm = args.domains_only
+    skip_tm = args.domains_only or args.no_tm
     skip_socials = args.domains_only or args.no_socials
     show_socials = not skip_socials
     show_rules = not args.no_rules
@@ -330,10 +373,11 @@ def main():
         _slow_delay = 1.5
 
     # Banner
-    print_banner(len(names), skip_abn, skip_tm, skip_socials,
-                 bool(config.ABN_GUID))
+    if not args.quiet:
+        print_banner(len(names), skip_abn, skip_tm, skip_socials,
+                     bool(config.ABN_GUID))
 
-    use_spinner = sys.stdout.isatty()
+    use_spinner = sys.stdout.isatty() and not args.quiet
     is_single = len(names) == 1
 
     all_results = []
@@ -374,7 +418,7 @@ def main():
                        active_tlds=active_tlds,
                        show_rules=show_rules)
 
-        if idx < len(names) - 1:
+        if idx < len(names) - 1 and not args.quiet:
             animate_transition()
 
     display_summary(all_results, show_socials=show_socials, active_tlds=active_tlds)

@@ -167,9 +167,14 @@ def check_all_domains(name: str, tlds: list[str] | None = None) -> list[dict]:
         for future in as_completed(futures, timeout=GLOBAL_TIMEOUT):
             try:
                 results.append(future.result(timeout=0.1))
-            except Exception:
+            except Exception as e:
                 tld = futures[future]
                 timed_out_tlds.add(tld)
+                results.append({
+                    "domain": f"{clean}.{tld}", "tld": tld, "available": None,
+                    "detail": f"error: {e}", "cost": DOMAIN_COSTS.get(tld, ""),
+                    "expiry": None,
+                })
 
     # Add timeout entries for any TLDs that didn't complete
     completed_tlds = {r["tld"] for r in results}

@@ -105,11 +105,18 @@ def generate_names(base_words: list[str], count: int = 30,
                 for blend in _portmanteau(other_cap, word):
                     candidates.add(blend)
 
-    # Return a random sample if we have too many
-    candidates = list(candidates)
-    if len(candidates) > count:
-        random.shuffle(candidates)
-        candidates = candidates[:count]
+    # Deduplicate case-insensitively
+    seen = set()
+    unique = []
+    for c in candidates:
+        if c.lower() not in seen:
+            seen.add(c.lower())
+            unique.append(c)
 
-    candidates.sort(key=str.lower)
-    return candidates
+    # Return a random sample if we have too many
+    if len(unique) > count:
+        random.shuffle(unique)
+        unique = unique[:count]
+
+    unique.sort(key=str.lower)
+    return unique
